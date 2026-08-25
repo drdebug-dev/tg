@@ -2,6 +2,21 @@
 set -e
 
 DOMAIN="${BRIDGE_DOMAIN:?Set BRIDGE_DOMAIN (e.g. tg-api.example.com)}"
+BEHIND_PROXY="${BEHIND_PROXY:-1}"
+
+if [ -n "${ALLOW_IRAN_IP:-}" ]; then
+    export ALLOW_BLOCK="allow ${ALLOW_IRAN_IP}; deny all;"
+else
+    export ALLOW_BLOCK=""
+fi
+
+if [ "$BEHIND_PROXY" = "1" ] || [ "$BEHIND_PROXY" = "true" ]; then
+    envsubst '${ALLOW_BLOCK}' \
+        < /etc/nginx/nginx-http.conf.template \
+        > /etc/nginx/conf.d/default.conf
+    exec nginx -g "daemon off;"
+fi
+
 LE_CERT="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
 LE_KEY="/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
 DUMMY_DIR="/etc/nginx/ssl"
@@ -26,17 +41,8 @@ else
     echo "Issue a cert, then: docker compose restart nginx"
 fi
 
-if [ -n "${ALLOW_IRAN_IP:-}" ]; then
-    export ALLOW_BLOCK="allow ${ALLOW_IRAN_IP}; deny all;"
-else
-    export ALLOW_BLOCK=""
-fi
-
 envsubst '${BRIDGE_DOMAIN} ${SSL_CERT} ${SSL_KEY} ${ALLOW_BLOCK}' \
     < /etc/nginx/nginx.conf.template \
     > /etc/nginx/conf.d/default.conf
-
-# Drop the default site so only the generated vhost is used.
-rm -f /etc/nginx/conf.d/default.conf.bak
 
 exec nginx -g "daemon off;"

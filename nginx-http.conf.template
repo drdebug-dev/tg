@@ -1,0 +1,33 @@
+# HTTP-only Bot API reverse proxy — TLS is terminated by the VPS nginx in front.
+# Access log is off because the bot token is in the request URI.
+
+server {
+    listen 80 default_server;
+    server_name _;
+
+    access_log off;
+    error_log  /var/log/nginx/error.log warn;
+
+    client_max_body_size 50m;
+    client_body_timeout 120s;
+
+    ${ALLOW_BLOCK}
+
+    resolver 1.1.1.1 8.8.8.8 ipv6=off valid=300s;
+    resolver_timeout 5s;
+
+    location / {
+        proxy_pass              https://api.telegram.org;
+        proxy_ssl_server_name   on;
+        proxy_ssl_name          api.telegram.org;
+        proxy_set_header        Host api.telegram.org;
+        proxy_http_version      1.1;
+        proxy_set_header        Connection "";
+        proxy_connect_timeout   30s;
+        proxy_send_timeout      120s;
+        proxy_read_timeout      120s;
+        proxy_buffering         off;
+        proxy_request_buffering off;
+        proxy_redirect          off;
+    }
+}

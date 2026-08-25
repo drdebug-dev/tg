@@ -1,15 +1,11 @@
 # ============================================================
-#  Telegram Bot API bridge — run this on a foreign VPS.
-#  Iranian app sets TELEGRAM_API_BASE=https://<BRIDGE_DOMAIN>
+#  Telegram Bot API bridge — run on a foreign VPS that already
+#  has nginx (or other apps) on ports 80/443.
 #
-#  First time:
-#    1. cp .env.example .env  → set BRIDGE_DOMAIN and CERTBOT_EMAIL
-#    2. Point DNS A record of BRIDGE_DOMAIN to this VPS
-#    3. docker compose up -d nginx
-#    4. docker compose run --rm --entrypoint certbot certbot certonly \
-#         --webroot -w /var/www/certbot -d "$BRIDGE_DOMAIN" \
-#         --email "$CERTBOT_EMAIL" --agree-tos --no-eff-email
-#    5. docker compose restart nginx
+#  Default: HTTP on 127.0.0.1:8089 (does not take 80/443).
+#  Put a vhost on your existing nginx — see host-nginx.conf
+#
+#  Iranian app: TELEGRAM_API_BASE=https://<BRIDGE_DOMAIN>
 # ============================================================
 
 services:
@@ -18,26 +14,9 @@ services:
     container_name: telegram-bridge
     environment:
       BRIDGE_DOMAIN: ${BRIDGE_DOMAIN:?Set BRIDGE_DOMAIN in .env}
+      BEHIND_PROXY: ${BEHIND_PROXY:-1}
       ALLOW_IRAN_IP: ${ALLOW_IRAN_IP:-}
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
+      # Avoid clashing with the VPS nginx on :80 / :443
+      - "${BRIDGE_BIND:-127.0.0.1}:${BRIDGE_PORT:-8089}:80"
     restart: unless-stopped
-
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h; done
-    restart: unless-stopped
-
-volumes:
-  certbot_www:
-  certbot_conf:
