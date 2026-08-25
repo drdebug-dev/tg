@@ -1,69 +1,66 @@
-# پل Bot API تلگرام (VPS خارجی)
+# پل Bot API تلگرام — VPS خارجی `dg.pingol.ir`
 
-هاست ایران به `api.telegram.org` دسترسی ندارد. این سرویس ترافیک را به Bot API پروکسی می‌کند. توکن روی این سرور ذخیره نمی‌شود.
+هاست ایران به `api.telegram.org` دسترسی ندارد. ترافیک از این دامنه به Bot API پروکسی می‌شود. توکن اینجا ذخیره نمی‌شود.
 
 ```
-هاست ایران  →  https://BRIDGE_DOMAIN (nginx موجود روی VPS)  →  telegram-bridge:8089  →  api.telegram.org
+هاست ایران  →  https://dg.pingol.ir (Cloudflare + Traefik)  →  telegram-bridge  →  api.telegram.org
 ```
 
-اگر روی VPS از قبل nginx یا برنامه دیگری پورت ۸۰/۴۴۳ را گرفته، **حالت پیش‌فرض همین است** و آن پورت‌ها را اشغال نمی‌کند.
+روی اپ ایران:
 
-## راه‌اندازی (کنار برنامه‌های دیگر)
+```
+TELEGRAM_API_BASE=https://dg.pingol.ir
+```
 
-۱. DNS: رکورد A ساب‌دامین (مثلاً `tg-api.example.com`) را به IP همین VPS بدهید.
+## راه‌اندازی روی VPS
 
-۲. اگر کانتینر قبلی به‌خاطر پورت ۸۰ fail شده، اول آن را بردارید:
+۱. در Cloudflare رکورد A (یا CNAME) برای `dg.pingol.ir` به IP همین VPS باشد. SSL بهتر است روی Full باشد.
+
+۲. شبکه Traefik را پیدا کنید:
+
+```bash
+docker network ls
+docker ps --format '{{.Names}}' | grep -i traefik
+```
+
+۳. `.env` را از نمونه بسازید و `TRAEFIK_NETWORK` را همان نام شبکه Traefik بگذارید:
+
+```bash
+cp .env.example .env
+# BRIDGE_DOMAIN=dg.pingol.ir
+# TRAEFIK_NETWORK=...
+```
+
+۴. اگر کانتینر قبلی به‌خاطر پورت ۸۰ fail شده:
 
 ```bash
 docker compose down
 ```
 
-۳. تنظیمات:
+۵. بالا آوردن با اتصال به شبکه Traefik:
 
 ```bash
-cp .env.example .env
-# BRIDGE_DOMAIN را پر کنید؛ BEHIND_PROXY=1 بماند
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 ```
 
-۴. پل را بالا بیاورید (فقط `127.0.0.1:8089`):
+اگر overlay را نمی‌خواهید:
 
 ```bash
 docker compose up -d --build
+docker network connect <شبکه_traefik> telegram-bridge
 ```
 
-۵. روی **nginx موجود** یک vhost اضافه کنید. نمونه: [`host-nginx.conf`](host-nginx.conf)
-
-- اگر nginx روی خود سیستم نصب است: `proxy_pass http://127.0.0.1:8089;`
-- اگر nginx داخل Docker است (مثلاً `faktoos_nginx`):
+۶. تست از خود VPS:
 
 ```bash
-docker network connect <شبکه_nginx> telegram-bridge
+curl -sS http://127.0.0.1:8089/
+curl -sS "https://dg.pingol.ir/bot<BOT_TOKEN>/getMe"
 ```
 
-و در vhost بگذارید: `proxy_pass http://telegram-bridge:80;`
+`getMe` باید JSON با `"ok":true` برگرداند. صفحه خالی دامنه (`/`) سایت نیست؛ مسیر درست Bot API است.
 
-گواهی HTTPS را همان nginx موجود صادر کند (certbot / پنل). بعد `nginx -s reload`.
+اگر باز متن `404 page not found` آمد، Traefik هنوز این Host را ندارد: اسم `TRAEFIK_ENTRYPOINT` و شبکه را با استک‌های دیگر روی همین VPS مقایسه کنید.
 
-۶. تست:
+## nginx به‌جای Traefik
 
-```bash
-curl -sS https://tg-api.example.com/
-```
-
-باید پاسخ تلگرام بیاید، نه خطای اتصال.
-
-## اپ روی هاست ایران
-
-```
-TELEGRAM_API_BASE=https://tg-api.example.com
-```
-
-بدون اسلش انتهایی. بعد اپ را ری‌استارت کنید.
-
-## حالت مستقل (VPS خالی، پورت ۸۰ آزاد)
-
-فقط اگر هیچ وب‌سروری روی ۸۰/۴۴۳ نیست:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
-```
+اگر لبه سرور nginx است نه Traefik، نمونه vhost: [`host-nginx.conf`](host-nginx.conf) با `server_name dg.pingol.ir`.

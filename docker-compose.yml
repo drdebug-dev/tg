@@ -1,11 +1,10 @@
 # ============================================================
-#  Telegram Bot API bridge — run on a foreign VPS that already
-#  has nginx (or other apps) on ports 80/443.
+#  Telegram Bot API bridge — foreign VPS (dg.pingol.ir)
 #
-#  Default: HTTP on 127.0.0.1:8089 (does not take 80/443).
-#  Put a vhost on your existing nginx — see host-nginx.conf
+#  Iranian app: TELEGRAM_API_BASE=https://dg.pingol.ir
 #
-#  Iranian app: TELEGRAM_API_BASE=https://<BRIDGE_DOMAIN>
+#  This VPS already has Traefik on 80/443. Do not bind those ports.
+#  After up: docker network connect <traefik_network> telegram-bridge
 # ============================================================
 
 services:
@@ -13,10 +12,17 @@ services:
     build: .
     container_name: telegram-bridge
     environment:
-      BRIDGE_DOMAIN: ${BRIDGE_DOMAIN:?Set BRIDGE_DOMAIN in .env}
+      BRIDGE_DOMAIN: ${BRIDGE_DOMAIN:-dg.pingol.ir}
       BEHIND_PROXY: ${BEHIND_PROXY:-1}
       ALLOW_IRAN_IP: ${ALLOW_IRAN_IP:-}
     ports:
-      # Avoid clashing with the VPS nginx on :80 / :443
       - "${BRIDGE_BIND:-127.0.0.1}:${BRIDGE_PORT:-8089}:80"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tg-bridge.rule=Host(`${BRIDGE_DOMAIN:-dg.pingol.ir}`)
+      - traefik.http.routers.tg-bridge.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.tg-bridge.tls=true
+      - traefik.http.routers.tg-bridge.service=tg-bridge
+      - traefik.http.services.tg-bridge.loadbalancer.server.port=80
+      - traefik.http.services.tg-bridge.loadbalancer.passHostHeader=true
     restart: unless-stopped
