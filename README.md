@@ -3,18 +3,25 @@
 هاست ایران به `api.telegram.org` دسترسی ندارد. ترافیک از این دامنه به Bot API پروکسی می‌شود. توکن اینجا ذخیره نمی‌شود.
 
 ```
-هاست ایران  →  https://dg.pingol.ir (Cloudflare + Traefik)  →  telegram-bridge  →  api.telegram.org
+هاست ایران  →  https://dg.pingol.ir (DNS مستقیم به VPS + Traefik)  →  telegram-bridge  →  api.telegram.org
 ```
 
 روی اپ ایران:
 
 ```
 TELEGRAM_API_BASE=https://dg.pingol.ir
+TELEGRAM_API_SSL_VERIFY=false
 ```
+
+`SSL_VERIFY=false` لازم است تا وقتی Traefik هنوز گواهی Let’s Encrypt برای این ساب‌دامین ندارد (الان self-signed می‌دهد). بعد از صدور گواهی واقعی می‌توانید `true` بگذارید.
 
 ## راه‌اندازی روی VPS
 
-۱. در Cloudflare رکورد A (یا CNAME) برای `dg.pingol.ir` به IP همین VPS باشد. SSL بهتر است روی Full باشد.
+۱. در Cloudflare رکورد A برای `dg.pingol.ir` به IP همین VPS باشد.
+
+   **پروکسی نارنجی را خاموش کنید (DNS only / ابر خاکستری).** از ایران IPهای Cloudflare اغلب کند یا فیلترند.
+
+   روی Traefik برای این دامنه `tls.certresolver` بگذارید (همان resolver بقیه سایت‌های pingol.ir). بدون آن Traefik گواهی self-signed می‌دهد و اپ ایران با `CERTIFICATE_VERIFY_FAILED` قطع می‌شود.
 
 ۲. شبکه Traefik را پیدا کنید:
 
